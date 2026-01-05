@@ -7,7 +7,7 @@ credentials:
       last_name: Smith
       logged_in: False
       name: John Smith
-      password: "123"
+      password: "$2b$12$KMLj07FnsORE3z1whaIl.uz0ir4YbW3LsTUwTFplsrhEU0uS8fN3O"
     kmrad:
       email: khaled.mrad@devoteam.com
       failed_login_attempts: 0
@@ -15,7 +15,7 @@ credentials:
       last_name: Mrad
       logged_in: False
       name: Khaled Mrad
-      password: "456"
+      password: "$2b$12$sq3ZWxOOMDXrPYcnLWowcODa0KV5NVPMdglSqq2nJpScYS84yoaa6"
 cookie:
   expiry_days: 30
   key: "random_signature_key_devoteam"
