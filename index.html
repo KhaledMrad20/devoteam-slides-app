@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AI Presentation Generator</title>
+    <meta name="description" content="Generate professional presentations from your content using AI. Simple, fast, and modern.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+    <div class="app-container">
+        <main class="main-content" role="main">
+            <div class="brand-section">
+                <img src="{{ url_for('static', filename='assets/devoteam.png') }}" alt="Devoteam" class="logo" />
+            </div>
+
+            <div class="input-card">
+                <h1 class="card-title">Create Your Presentation</h1>
+                <p class="card-subtitle">Describe your presentation idea and let AI bring it to life</p>
+
+                <form action="/" method="post" novalidate>
+                    <label for="content" class="visually-hidden">Content to generate slides from</label>
+
+                    <textarea id="content" name="content_input" rows="6"
+                        placeholder="Describe your presentation topic, key points, and any specific requirements..."
+                        required minlength="100" maxlength="5000"></textarea>
+
+                    <button type="submit" class="generate-btn">
+                        <span>Generate PPTX</span>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M4.5 10H15.5M15.5 10L10.5 5M15.5 10L10.5 15" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                </form>
+            </div>
+
+            <footer class="footer">
+                <p>© 2025 Devoteam. All rights reserved.</p>
+            </footer>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+
+</html>
