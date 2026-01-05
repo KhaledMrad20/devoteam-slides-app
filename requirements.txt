@@ -1,0 +1,6 @@
+streamlit
+streamlit-authenticator
+google-genai
+python-pptx
+pyyaml
+watchdog

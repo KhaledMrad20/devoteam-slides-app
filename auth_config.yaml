@@ -1,0 +1,17 @@
+credentials:
+  usernames:
+    jsmith:
+      email: jsmith@devoteam.com
+      failed_login_attempts: 0
+      first_name: John
+      last_name: Smith
+      logged_in: False
+      name: John Smith
+      password: "123" 
+cookie:
+  expiry_days: 30
+  key: "random_signature_key_devoteam"
+  name: "devoteam_login_cookie"
+preauthorized:
+  emails:
+  - admin@devoteam.com
