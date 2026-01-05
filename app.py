@@ -5,11 +5,47 @@ from yaml.loader import SafeLoader
 import os
 
 # --- CONNECT TO YOUR LOGIC ---
-# We import the functions you created in Step 1
 from generator_logic import generate_presentation_outline, create_presentation_file
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Devoteam Slide Gen", page_icon="📊", layout="centered")
+
+# --- CUSTOM CSS FOR DEVOTEAM BRANDING ---
+st.markdown("""
+<style>
+    /* 1. Main Background Color (Light Grey) */
+    .stApp {
+        background-color: #F5F5F5;
+    }
+    
+    /* 2. Style the Buttons (Devoteam Red color) */
+    .stButton>button {
+        color: white;
+        background-color: #E63312; /* Devoteam Red */
+        border-radius: 8px;
+        border: none;
+        padding: 10px 24px;
+        font-weight: bold;
+    }
+    .stButton>button:hover {
+        background-color: #B3240B; /* Darker Red on hover */
+        color: white;
+        border: none;
+    }
+
+    /* 3. Customize Input Box */
+    .stTextInput>div>div>input, .stTextArea>div>div>textarea {
+        background-color: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+    }
+
+    /* 4. Hide Streamlit Default Menu & Footer */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
 
 # --- AUTHENTICATION SETUP ---
 auth_file = "auth_config.yaml"
