@@ -2,11 +2,11 @@ import json
 import re
 import os
 import streamlit as st
-import google.generativeai as genai # <--- ANCIENNE LIBRAIRIE (PLUS STABLE)
+import google.generativeai as genai
 from pptx import Presentation
 from pptx.util import Inches, Pt
 
-# --- CONFIGURATION DE LA CLÉ ---
+# --- CONFIGURATION CLÉ API ---
 try:
     if "GEMINI_API_KEY" in st.secrets:
         api_key = st.secrets["GEMINI_API_KEY"]
@@ -15,12 +15,11 @@ try:
 except:
     api_key = os.environ.get("GEMINI_API_KEY")
 
-# Configuration globale de l'API
 if api_key:
     genai.configure(api_key=api_key)
 
-# --- CHOIX DU MODÈLE (VERSION STABLE) ---
-MODEL_NAME = "gemini-1.5-flash"
+# --- CHANGEMENT ICI : ON UTILISE LE MODÈLE "PRO" (LE PLUS STABLE) ---
+MODEL_NAME = "gemini-pro"
 
 LAYOUT_MAP = { 
     "COVER": 0,      
@@ -32,8 +31,10 @@ LAYOUT_MAP = {
 
 def clean_json_response(text):
     text = text.strip()
+    # Nettoyage agressif pour trouver le JSON
     match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL)
     if match: return match.group(1)
+    
     start = text.find('{')
     end = text.rfind('}')
     if start != -1 and end != -1: return text[start:end+1]
@@ -47,47 +48,42 @@ def safe_add_slide(prs, layout_index):
         return prs.slides.add_slide(prs.slide_layouts[0])
 
 def generate_presentation_outline(content):
-    print(f"--- CALLING GEMINI AI (LEGACY LIB) ---")
+    print(f"--- CALLING GEMINI PRO ---")
     
     if not api_key:
         return {"presentation_title": "Error", "subtitle": "API Key Missing", "slides": []}
 
+    # Structure simplifiée pour Gemini Pro qui est parfois têtu
     json_structure = """
     {
-        "presentation_title": "Title",
-        "subtitle": "Subtitle",
+        "presentation_title": "Titre",
+        "subtitle": "Sous-titre",
         "slides": [
-            { "title": "Slide Title", "content": ["Point 1", "Point 2"] }
+            { "title": "Titre Slide", "content": ["Point 1", "Point 2"] }
         ]
     }
     """
     
     prompt = f"""
-    You are a Devoteam Presentation Expert.
-    TOPIC: "{content}"
-    OUTPUT JSON STRUCTURE: {json_structure}
-    INSTRUCTIONS: Create a structured presentation with 4-6 slides in French.
+    Rôle: Expert Devoteam.
+    Sujet: "{content}"
+    Tâche: Créer une présentation de 5 slides en Français.
+    Format OBLIGATOIRE: JSON pur respectant cette structure: {json_structure}
+    Important: Ne rien écrire avant ou après le JSON.
     """
 
     try:
-        # Initialisation du modèle version 'GenerativeModel'
         model = genai.GenerativeModel(MODEL_NAME)
+        response = model.generate_content(prompt)
         
-        # Appel API
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                response_mime_type="application/json"
-            )
-        )
-        
-        data = json.loads(clean_json_response(response.text))
+        # On tente de nettoyer la réponse
+        cleaned_text = clean_json_response(response.text)
+        data = json.loads(cleaned_text)
         return data
 
     except Exception as e:
         print(f"ERROR: {e}")
-        # Fallback si le modèle JSON natif échoue (parfois le cas sur les vieux comptes)
-        return { "presentation_title": "Error", "subtitle": str(e), "slides": [] }
+        return { "presentation_title": "Error", "subtitle": f"Erreur IA: {str(e)}", "slides": [] }
 
 def create_presentation_file(data, template_path="my_brand_template.pptx", output_filename="/tmp/output.pptx"):
     try: prs = Presentation(template_path)
@@ -97,7 +93,7 @@ def create_presentation_file(data, template_path="my_brand_template.pptx", outpu
     slide = safe_add_slide(prs, LAYOUT_MAP["COVER"])
     if slide.shapes.title: slide.shapes.title.text = data.get('presentation_title', 'Devoteam AI')
     
-    # 2. Slides Contenu
+    # 2. Slides
     for slide_data in data.get('slides', []):
         slide = safe_add_slide(prs, LAYOUT_MAP["CONTENT"])
         if slide.shapes.title: slide.shapes.title.text = slide_data.get('title', 'Slide')
