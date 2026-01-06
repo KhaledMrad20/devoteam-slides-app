@@ -15,8 +15,8 @@ try:
 except:
     API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# --- 2. MODÈLE UNIQUE (POUR ÉCONOMISER LE QUOTA) ---
-# On vise uniquement le modèle Flash standard qui a le plus gros quota gratuit
+# --- 2. LE MEILLEUR MODÈLE UNIQUE ---
+# C'est la version stable et rapide standard
 MODEL_NAME = "gemini-1.5-flash"
 
 LAYOUT_MAP = { 
@@ -40,31 +40,32 @@ def safe_add_slide(prs, layout_index):
         return prs.slides.add_slide(prs.slide_layouts[0])
 
 def generate_presentation_outline(content):
-    print(f"--- CALLING GEMINI 1.5 FLASH (SINGLE CALL) ---")
+    print(f"--- CALLING GEMINI 1.5 FLASH (SINGLE) ---")
     
     if not API_KEY:
         return {"presentation_title": "Error", "subtitle": "API Key Missing", "slides": []}
 
     json_structure = """
     {
-        "presentation_title": "Titre",
+        "presentation_title": "Titre Présentation",
         "subtitle": "Sous-titre",
         "slides": [
-            { "title": "Titre Slide", "content": ["Point 1", "Point 2"] }
+            { "title": "Titre Slide", "content": ["Point 1", "Point 2", "Point 3"] }
         ]
     }
     """
     
     prompt = f"""
-    Rôle: Expert Devoteam. Sujet: "{content}".
-    Tâche: Créer une présentation de 5 slides en Français.
-    Format JSON OBLIGATOIRE: {json_structure}
+    Rôle: Expert Consultant Devoteam.
+    Sujet: "{content}"
+    Tâche: Générer une structure de présentation PowerPoint (5-6 slides) en Français.
+    Format de sortie: JSON uniquement respectant cette structure: {json_structure}
     """
 
     try:
+        # Initialisation du client avec la nouvelle librairie
         client = genai.Client(api_key=API_KEY)
         
-        # Appel unique (1 seul crédit utilisé)
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=prompt,
@@ -75,23 +76,32 @@ def generate_presentation_outline(content):
         return data
 
     except Exception as e:
-        print(f"ERROR: {e}")
-        return { 
-            "presentation_title": "Error", 
-            "subtitle": f"Erreur ou Quota dépassé. Attendez 1 minute. Détail: {str(e)}", 
-            "slides": [] 
-        }
+        error_msg = str(e)
+        print(f"ERROR: {error_msg}")
+        
+        # Gestion des messages d'erreur pour vous aider
+        if "404" in error_msg:
+            subtitle = "Erreur 404: La clé API est valide mais le projet Google n'a pas accès au modèle. Solution: Créez une nouvelle clé dans un 'New Project'."
+        elif "429" in error_msg:
+            subtitle = "Erreur 429: Quota dépassé. Créez une nouvelle clé API dans un 'New Project' pour remettre le compteur à zéro."
+        else:
+            subtitle = f"Erreur technique: {error_msg}"
+            
+        return { "presentation_title": "Error", "subtitle": subtitle, "slides": [] }
 
 def create_presentation_file(data, template_path="my_brand_template.pptx", output_filename="/tmp/output.pptx"):
     try: prs = Presentation(template_path)
     except: prs = Presentation() 
     
+    # 1. Slide Titre
     slide = safe_add_slide(prs, LAYOUT_MAP["COVER"])
     if slide.shapes.title: slide.shapes.title.text = data.get('presentation_title', 'Devoteam AI')
     
+    # 2. Slides Contenu
     for slide_data in data.get('slides', []):
         slide = safe_add_slide(prs, LAYOUT_MAP["CONTENT"])
         if slide.shapes.title: slide.shapes.title.text = slide_data.get('title', 'Slide')
+        
         if len(slide.placeholders) > 1:
             tf = slide.placeholders[1].text_frame
             tf.clear()
