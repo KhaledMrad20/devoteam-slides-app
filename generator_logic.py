@@ -2,24 +2,21 @@ import json
 import re
 import os
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from pptx import Presentation
-from pptx.util import Inches, Pt
 
 # --- CONFIGURATION CLÉ API ---
 try:
     if "GEMINI_API_KEY" in st.secrets:
-        api_key = st.secrets["GEMINI_API_KEY"]
+        API_KEY = st.secrets["GEMINI_API_KEY"]
     else:
-        api_key = os.environ.get("GEMINI_API_KEY")
+        API_KEY = os.environ.get("GEMINI_API_KEY")
 except:
-    api_key = os.environ.get("GEMINI_API_KEY")
+    API_KEY = os.environ.get("GEMINI_API_KEY")
 
-if api_key:
-    genai.configure(api_key=api_key)
-
-# --- CHANGEMENT ICI : ON UTILISE LE MODÈLE "PRO" (LE PLUS STABLE) ---
-MODEL_NAME = "gemini-pro"
+# --- MODÈLE ACTUEL ---
+MODEL_NAME = "gemini-1.5-flash"
 
 LAYOUT_MAP = { 
     "COVER": 0,      
@@ -31,10 +28,8 @@ LAYOUT_MAP = {
 
 def clean_json_response(text):
     text = text.strip()
-    # Nettoyage agressif pour trouver le JSON
     match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL)
     if match: return match.group(1)
-    
     start = text.find('{')
     end = text.rfind('}')
     if start != -1 and end != -1: return text[start:end+1]
@@ -48,12 +43,11 @@ def safe_add_slide(prs, layout_index):
         return prs.slides.add_slide(prs.slide_layouts[0])
 
 def generate_presentation_outline(content):
-    print(f"--- CALLING GEMINI PRO ---")
+    print(f"--- CALLING GEMINI 1.5 FLASH (NEW LIB) ---")
     
-    if not api_key:
+    if not API_KEY:
         return {"presentation_title": "Error", "subtitle": "API Key Missing", "slides": []}
 
-    # Structure simplifiée pour Gemini Pro qui est parfois têtu
     json_structure = """
     {
         "presentation_title": "Titre",
@@ -68,17 +62,20 @@ def generate_presentation_outline(content):
     Rôle: Expert Devoteam.
     Sujet: "{content}"
     Tâche: Créer une présentation de 5 slides en Français.
-    Format OBLIGATOIRE: JSON pur respectant cette structure: {json_structure}
-    Important: Ne rien écrire avant ou après le JSON.
+    Format JSON OBLIGATOIRE: {json_structure}
     """
 
     try:
-        model = genai.GenerativeModel(MODEL_NAME)
-        response = model.generate_content(prompt)
+        # Initialisation Client Nouvelle Librairie
+        client = genai.Client(api_key=API_KEY)
         
-        # On tente de nettoyer la réponse
-        cleaned_text = clean_json_response(response.text)
-        data = json.loads(cleaned_text)
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json")
+        )
+        
+        data = json.loads(clean_json_response(response.text))
         return data
 
     except Exception as e:
