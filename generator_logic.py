@@ -6,7 +6,7 @@ from google import genai
 from google.genai import types
 from pptx import Presentation
 
-# --- CONFIGURATION CLÉ API ---
+# --- 1. RÉCUPÉRATION DE LA CLÉ ---
 try:
     if "GEMINI_API_KEY" in st.secrets:
         API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -15,14 +15,9 @@ try:
 except:
     API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# --- LISTE DES MODÈLES À TESTER (ORDRE DE PRÉFÉRENCE) ---
-# Le code essaiera ces noms un par un jusqu'à ce que ça marche
-MODELS_TO_TRY = [
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-001",
-    "gemini-1.5-pro",
-    "gemini-2.0-flash-exp"
-]
+# --- 2. MODÈLE UNIQUE (POUR ÉCONOMISER LE QUOTA) ---
+# On vise uniquement le modèle Flash standard qui a le plus gros quota gratuit
+MODEL_NAME = "gemini-1.5-flash"
 
 LAYOUT_MAP = { 
     "COVER": 0, "SOMMAIRE": 1, "SECTION": 2, "CONTENT": 1, "THANK_YOU": 2   
@@ -45,7 +40,7 @@ def safe_add_slide(prs, layout_index):
         return prs.slides.add_slide(prs.slide_layouts[0])
 
 def generate_presentation_outline(content):
-    print(f"--- STARTING SMART GENERATION ---")
+    print(f"--- CALLING GEMINI 1.5 FLASH (SINGLE CALL) ---")
     
     if not API_KEY:
         return {"presentation_title": "Error", "subtitle": "API Key Missing", "slides": []}
@@ -66,39 +61,26 @@ def generate_presentation_outline(content):
     Format JSON OBLIGATOIRE: {json_structure}
     """
 
-    # Initialisation du client
     try:
         client = genai.Client(api_key=API_KEY)
+        
+        # Appel unique (1 seul crédit utilisé)
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json")
+        )
+        
+        data = json.loads(clean_json_response(response.text))
+        return data
+
     except Exception as e:
-        return { "presentation_title": "Error", "subtitle": f"Client Init Failed: {str(e)}", "slides": [] }
-
-    # --- BOUCLE INTELLIGENTE DE DÉTECTION DU MODÈLE ---
-    last_error = ""
-    for model_name in MODELS_TO_TRY:
-        print(f"--- TRYING MODEL: {model_name} ---")
-        try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(response_mime_type="application/json")
-            )
-            
-            # Si on arrive ici, c'est que ça a marché !
-            print(f"--- SUCCESS WITH {model_name} ---")
-            data = json.loads(clean_json_response(response.text))
-            return data
-
-        except Exception as e:
-            print(f"FAILED {model_name}: {e}")
-            last_error = str(e)
-            continue # On essaie le suivant
-
-    # Si tout échoue, on renvoie la dernière erreur et une aide
-    return { 
-        "presentation_title": "Error", 
-        "subtitle": f"Tous les modèles ont échoué. Dernière erreur (404 = Clé API invalide ou projet sans API active): {last_error}", 
-        "slides": [] 
-    }
+        print(f"ERROR: {e}")
+        return { 
+            "presentation_title": "Error", 
+            "subtitle": f"Erreur ou Quota dépassé. Attendez 1 minute. Détail: {str(e)}", 
+            "slides": [] 
+        }
 
 def create_presentation_file(data, template_path="my_brand_template.pptx", output_filename="/tmp/output.pptx"):
     try: prs = Presentation(template_path)
