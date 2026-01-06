@@ -1,25 +1,23 @@
 import json
 import re
 import os
-import streamlit as st  # <--- INDISPENSABLE POUR LIRE LES SECRETS
+import streamlit as st
 from google import genai
 from google.genai import types
 from pptx import Presentation
 from pptx.util import Inches, Pt
 
 # --- CONFIGURATION DE LA CLÉ ---
-# Cette partie cherche la clé directement dans le coffre-fort Streamlit
 try:
     if "GEMINI_API_KEY" in st.secrets:
         API_KEY = st.secrets["GEMINI_API_KEY"]
     else:
-        # Fallback pour test local si besoin
         API_KEY = os.environ.get("GEMINI_API_KEY")
 except FileNotFoundError:
-    # Si on n'est pas sur Streamlit Cloud
     API_KEY = os.environ.get("GEMINI_API_KEY")
 
-MODEL_NAME = "gemini-1.5-flash" 
+# --- CORRECTION ICI : UTILISATION DE LA VERSION STABLE 001 ---
+MODEL_NAME = "gemini-1.5-flash-001" 
 
 # --- CONFIGURATION DU LAYOUT PPTX ---
 LAYOUT_MAP = { 
@@ -32,7 +30,6 @@ LAYOUT_MAP = {
 
 def clean_text(text):
     if not text: return "Untitled"
-    # Nettoyage des balises Markdown
     text = re.sub(r'\s*\((SECTION|CONTENT|Section|Content)\)\s*', '', text, flags=re.IGNORECASE)
     text = re.sub(r'^\d+[\.\-\)\s]+\s*', '', text) 
     text = text.replace('**', '').replace('__', '')
@@ -40,7 +37,6 @@ def clean_text(text):
 
 def clean_json_response(text):
     text = text.strip()
-    # Extraction du JSON si l'IA met des balises ```json ... ```
     match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL)
     if match: return match.group(1)
     
@@ -60,7 +56,6 @@ def safe_add_slide(prs, layout_index):
 def generate_presentation_outline(content):
     print(f"--- CALLING GEMINI AI ---")
     
-    # Vérification ultime de la clé
     if not API_KEY:
         return {
             "presentation_title": "Error", 
@@ -86,7 +81,6 @@ def generate_presentation_outline(content):
     """
 
     try:
-        # On passe la clé explicitement au client
         client = genai.Client(api_key=API_KEY)
         
         response = client.models.generate_content(
@@ -122,7 +116,6 @@ def create_presentation_file(data, template_path="my_brand_template.pptx", outpu
         if slide.shapes.title: 
             slide.shapes.title.text = slide_data.get('title', 'Slide')
         
-        # Ajout du texte
         if len(slide.placeholders) > 1:
             tf = slide.placeholders[1].text_frame
             tf.clear()
