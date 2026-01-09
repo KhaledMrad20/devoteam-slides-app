@@ -1,93 +1,65 @@
 import streamlit as st
-import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
 import os
+# On importe les fonctions de votre script 'generator.py'
+# Assurez-vous que votre fichier de script s'appelle bien 'generator.py'
+from generator import generate_presentation_outline, create_presentation_file
 
-# --- CONNECT TO YOUR LOGIC ---
-# We import the functions you created in Step 1
-from generator_logic import generate_presentation_outline, create_presentation_file
+# Configuration de la page
+st.set_page_config(page_title="IA PPT Generator", page_icon="📊")
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="Devoteam Slide Gen", page_icon="📊", layout="centered")
+st.title("📊 Générateur de Présentation AI")
+st.markdown("Entrez un sujet ou collez un texte, et l'IA créera le PowerPoint.")
 
-# --- AUTHENTICATION SETUP ---
-auth_file = "auth_config.yaml"
-try:
-    with open(auth_file) as file:
-        config = yaml.load(file, Loader=SafeLoader)
-except FileNotFoundError:
-    st.error(f"⚠️ Error: {auth_file} not found. Please create it in Step 3.")
-    st.stop()
+# 1. Zone de saisie
+user_input = st.text_area("Sujet ou Contenu du cours :", height=150)
 
-authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days']
-)
-
-# --- LOGIN SCREEN ---
-name, auth_status, username = authenticator.login('main')
-
-if auth_status is False:
-    st.error("Username/password is incorrect")
-elif auth_status is None:
-    st.warning("Please enter your Devoteam credentials.")
-elif auth_status:
-    # =========================================================
-    #  LOGGED IN AREA - THIS IS THE APP CONSULTANTS SEE
-    # =========================================================
-    authenticator.logout('Logout', 'sidebar')
-    
-    # Header
-    st.title("Devoteam AI Generator")
-    st.markdown(f"**Welcome, {name}!** Create professional slides in seconds.")
-    st.divider()
-
-    # Input Section
-    topic = st.text_area(
-        "Presentation Topic", 
-        height=100, 
-        placeholder="e.g. Cloud Migration Strategy for a Banking Client in France..."
-    )
-    
-    # Generate Button
-    if st.button("Generate Slides 🚀", type="primary"):
-        if not topic:
-            st.warning("Please enter a topic first.")
-        else:
-            with st.spinner("Consulting AI is thinking... (This usually takes 20-40 seconds)"):
+# 2. Bouton d'action
+if st.button("Générer la présentation", type="primary"):
+    if not user_input:
+        st.warning("Veuillez entrer du texte d'abord.")
+    else:
+        status_text = st.empty()
+        progress_bar = st.progress(0)
+        
+        try:
+            # Étape A : Génération du plan (Appel API)
+            status_text.text("🧠 L'IA réfléchit à la structure...")
+            progress_bar.progress(30)
+            
+            slide_data = generate_presentation_outline(user_input)
+            
+            # Vérification si l'API a renvoyé une erreur gérée
+            if slide_data.get("presentation_title") == "Error Occurred":
+                st.error(f"Erreur API : {slide_data.get('subtitle')}")
+            else:
+                # Étape B : Création du fichier PPTX
+                status_text.text("🎨 Création des diapositives PowerPoint...")
+                progress_bar.progress(70)
                 
-                # 1. Call the Brain (generator_logic.py)
-                data = generate_presentation_outline(topic)
+                output_file = "presentation_generee.pptx"
+                final_path = create_presentation_file(slide_data, output_filename=output_file)
                 
-                # Check for errors in the logic
-                if data.get("presentation_title") == "Error":
-                    st.error(f"Generation Failed: {data.get('subtitle')}")
-                else:
-                    # 2. Create the File
-                    # We use /tmp/ because Cloud Run is read-only elsewhere
-                    output_path = "/tmp/devoteam_slides.pptx"
+                if final_path:
+                    progress_bar.progress(100)
+                    status_text.text("✅ Terminé !")
                     
-                    # Ensure template exists, or it will use blank
-                    template = "my_brand_template.pptx"
-                    if not os.path.exists(template):
-                        st.warning("⚠️ Template file not found. Using blank style.")
-                    
-                    final_file = create_presentation_file(data, template_path=template, output_filename=output_path)
-                    
-                    # 3. Success & Download
-                    st.success("✅ Slides generated successfully!")
-                    
-                    with open(final_file, "rb") as file:
+                    # Étape C : Bouton de téléchargement
+                    with open(final_path, "rb") as file:
                         st.download_button(
-                            label="📥 Download PowerPoint (.pptx)",
+                            label="📥 Télécharger le PowerPoint (.pptx)",
                             data=file,
-                            file_name="Devoteam_Presentation.pptx",
+                            file_name=output_file,
                             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
                         )
+                        
+                    # Prévisualisation JSON (Optionnel, pour debug)
+                    with st.expander("Voir la structure générée (Debug)"):
+                        st.json(slide_data)
+                else:
+                    st.error("Erreur lors de la création du fichier PPTX.")
                     
-                    # 4. Preview (Optional: Show the plan)
-                    with st.expander("View Generated Plan"):
-                        st.json(data)
+        except Exception as e:
+            st.error(f"Une erreur inattendue est survenue : {e}")
+
+# Sidebar info
+st.sidebar.info("Assurez-vous que votre clé API est bien dans le fichier .env")
