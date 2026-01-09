@@ -2,7 +2,7 @@ import streamlit as st
 import os
 # On importe les fonctions de votre script 'generator.py'
 # Assurez-vous que votre fichier de script s'appelle bien 'generator.py'
-from generator import generate_presentation_outline, create_presentation_file
+from generator_logic import generate_presentation_outline, create_presentation_file
 
 # Configuration de la page
 st.set_page_config(page_title="IA PPT Generator", page_icon="📊")
@@ -63,3 +63,4 @@ if st.button("Générer la présentation", type="primary"):
 
 # Sidebar info
 st.sidebar.info("Assurez-vous que votre clé API est bien dans le fichier .env")
+
