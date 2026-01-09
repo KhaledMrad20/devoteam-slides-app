@@ -5,27 +5,29 @@ from google import genai
 from google.genai import types
 from pptx import Presentation
 from pptx.util import Inches, Pt
-from dotenv import load_dotenv
-load_dotenv()
-API_KEY = os.getenv("GEMINI_API_KEY")
-os.load_dotenv(overide=True)
-
+# On importe load_dotenv seulement si on est en local
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass # Sur Streamlit Cloud, dotenv n'est pas strictement requis si on utilise les Secrets
 
 # --- CONFIGURATION ---
-# FIX 1: SECURITY - We get the key from the Server Environment, not hardcoded
+# On récupère la clé depuis les variables d'environnement (Secrets ou .env)
+API_KEY = os.getenv("GEMINI_API_KEY")
 
-MODEL_NAME = "gemini-1.5-flash" # FIX: Use a stable model version for production
+MODEL_NAME = "gemini-1.5-flash"
 
-# --- LAYOUT MAP (Your Original Map) ---
+# --- LAYOUT MAP ---
 LAYOUT_MAP = { 
-    "COVER": 1,
-    "SOMMAIRE": 2,
-    "SECTION": 3,
-    "CONTENT": 4,
-    "THANK_YOU": 5
+    "COVER": 0,      # Modifié à 0 (souvent Title Slide)
+    "SOMMAIRE": 1,
+    "SECTION": 2,
+    "CONTENT": 1,    # Modifié à 1 (souvent Title and Content)
+    "THANK_YOU": 2   # Modifié à 2 (Section Header)
 }
 
-# --- TEXT CLEANING (Your Original Logic) ---
+# --- TEXT CLEANING ---
 def clean_text(text):
     if not text: return "Untitled"
     text = re.sub(r'\s*\((SECTION|CONTENT|Section|Content)\)\s*', '', text, flags=re.IGNORECASE)
@@ -67,7 +69,7 @@ def safe_add_slide(prs, layout_index):
         if layout_index < len(prs.slide_layouts):
             return prs.slides.add_slide(prs.slide_layouts[layout_index])
         else:
-            return prs.slides.add_slide(prs.slide_layouts[1])
+            return prs.slides.add_slide(prs.slide_layouts[0])
     except:
         return prs.slides.add_slide(prs.slide_layouts[0])
 
@@ -76,7 +78,7 @@ def generate_presentation_outline(content):
     
     # Check if API Key exists
     if not API_KEY:
-        return {"presentation_title": "Error", "subtitle": "API Key Missing", "slides": []}
+        return {"presentation_title": "Error Occurred", "subtitle": "Clé API manquante dans les Secrets Streamlit.", "slides": []}
 
     is_short_topic = len(content.strip()) < 150
     
@@ -91,14 +93,12 @@ def generate_presentation_outline(content):
     """
     
     if is_short_topic:
-        print("   -> Mode: CREATIVE")
         prompt = f"""
         You are a Presentation Creator. TOPIC: "{content}"
         INSTRUCTIONS: Create professional slides. Output valid JSON only.
         STRUCTURE: {json_structure}
         """
     else:
-        print("   -> Mode: STRICT")
         prompt = f"""
         You are a Data Extractor. INPUT TEXT: "{content}"
         INSTRUCTIONS: Extract content exactly. Output valid JSON only.
@@ -113,6 +113,8 @@ def generate_presentation_outline(content):
             config=types.GenerateContentConfig(response_mime_type="application/json")
         )
         
+        if not response.text: raise ValueError("Réponse vide de l'IA")
+
         raw_text = clean_json_response(response.text)
         data = json.loads(raw_text)
         data['original_text'] = content
@@ -121,10 +123,9 @@ def generate_presentation_outline(content):
 
     except Exception as e:
         print(f"⚠️ GEMINI ERROR: {str(e)}")
-        return { "presentation_title": "Error", "subtitle": str(e), "slides": [] }
+        return { "presentation_title": "Error Occurred", "subtitle": str(e), "slides": [] }
 
-# FIX 2: FILE SYSTEM - Default to /tmp/ for Cloud Run compatibility
-def create_presentation_file(data, template_path="my_brand_template.pptx", output_filename="/tmp/output_presentation.pptx"):
+def create_presentation_file(data, template_path="my_brand_template.pptx", output_filename="presentation_generee.pptx"):
     print(f"--- 2. GENERATING PPTX ---")
     try: prs = Presentation(template_path)
     except: 
@@ -208,24 +209,11 @@ def create_presentation_file(data, template_path="my_brand_template.pptx", outpu
         final_content = topic_data['content']
         section_count += 1
         
-        # Section Slide
-        try:
-            slide = safe_add_slide(prs, LAYOUT_MAP["SECTION"])
-            boxes = get_sorted_text_boxes(slide, h)
-            num_str = f"{section_count:02d}"
-            if len(boxes) >= 2:
-                boxes[0].text_frame.text = num_str
-                boxes[1].text_frame.text = final_title
-            elif len(boxes) == 1:
-                boxes[0].text_frame.text = f"{num_str} {final_title}"
-        except: pass
-
         # Content Slide
         try:
             slide = safe_add_slide(prs, LAYOUT_MAP["CONTENT"])
             boxes = get_sorted_text_boxes(slide, h)
             if len(boxes) > 0: boxes[0].text_frame.text = final_title
-            if not final_content: final_content = ["Content to be generated."]
             
             tf = None
             if len(boxes) > 1:
