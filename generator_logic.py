@@ -16,7 +16,7 @@ except ImportError:
 # On récupère la clé depuis les variables d'environnement (Secrets ou .env)
 API_KEY = os.getenv("GEMINI_API_KEY")
 
-MODEL_NAME = "gemini-1.5-flash-latest"
+MODEL_NAME = "gemini-pro"
 
 # --- LAYOUT MAP ---
 LAYOUT_MAP = { 
@@ -240,4 +240,5 @@ def create_presentation_file(data, template_path="my_brand_template.pptx", outpu
 
     prs.save(output_filename)
     return output_filename
+
 
